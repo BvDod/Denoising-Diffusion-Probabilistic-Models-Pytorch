@@ -6,7 +6,8 @@ diff_config = DiffusionConfig(
     dataset_name = "FFHQ",
     learning_rate = 0.001,
     batch_size= 32,
-    use_augmentation = False
+    use_augmentation = False,
+    timesteps_diff = 200,
 )
 
 train_diffusion(diff_config)
