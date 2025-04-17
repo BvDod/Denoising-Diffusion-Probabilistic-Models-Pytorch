@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from train import train_diffusion, DiffusionConfig
+from train import train_diffusion, DiffusionConfig, ModelConfig
 
 
 diff_config = DiffusionConfig(
@@ -10,5 +10,7 @@ diff_config = DiffusionConfig(
     timesteps_diff = 200,
 )
 
-train_diffusion(diff_config)
+model_config = ModelConfig()
+
+train_diffusion(diff_config, model_config)
 
