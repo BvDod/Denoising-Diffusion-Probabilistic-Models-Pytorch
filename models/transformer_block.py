@@ -18,7 +18,6 @@ class TransformerBlock(nn.Module):
         self.linear = nn.Linear(channels, channels)
 
     def forward(self, x_in):
-
         # Interstingly, no explicit positional encoding, should i try?
 
         b, c, h, w = x_in.shape
@@ -30,8 +29,8 @@ class TransformerBlock(nn.Module):
 
         x = self.attention(x, x, x)[0]
 
-        x = torch.movedim(x, -1,1)
         x = self.linear(x)
+        x = torch.movedim(x, -1,1)
         x = x.reshape((b,c,h,w))
 
         x = x_in + x
