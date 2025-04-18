@@ -7,6 +7,8 @@ import torch
 from functions.noise_scheduler import NoiseScheduler
 from models.UNET import UNetDiff
 
+from torchinfo import summary
+
 @dataclass
 class DiffusionConfig:
     dataset_name: str
@@ -17,7 +19,11 @@ class DiffusionConfig:
 
 @dataclass
 class ModelConfig:
-    pass
+    lowest_resolution_size: int
+    dim_multiply: list[int]
+    transformer_layers: list[int]
+    base_dim: int
+    
 
 
 def train_diffusion(train_config, model_config):
@@ -37,7 +43,11 @@ def train_diffusion(train_config, model_config):
 
     model_config.image_size = dataset_information.image_size
     model_config.channels = dataset_information.channels
-    model = UNetDiff(model_config)
+    model = UNetDiff(model_config).to(device)
+
+    print(summary(model, input_size=(32, 3, 128, 128)))
+
+
     noise_scheduler = NoiseScheduler(train_config)
 
     for x_train, y_train in dataloader_train:

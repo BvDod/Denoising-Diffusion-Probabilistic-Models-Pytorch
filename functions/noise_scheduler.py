@@ -4,12 +4,13 @@ class NoiseScheduler:
         """ Class used to manage beta schedule and add forward noise to samples """
         
         def __init__(self, train_config):
+            self.device = "cuda"
+
             self.timesteps = train_config.timesteps_diff
             self.beta_start = 0.0001
             self.beta_end = 0.02
-            self.betas = torch.linspace(self.beta_start, self.beta_end, self.timesteps, device=device)
+            self.betas = torch.linspace(self.beta_start, self.beta_end, self.timesteps, device=self.device)
             self.alphas_cumulative = torch.cumprod((1 - self.betas), dim=0)
-            self.device = "cuda"
 
 
         def get_random_ts(self, x):
