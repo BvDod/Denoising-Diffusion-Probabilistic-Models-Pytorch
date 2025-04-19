@@ -15,7 +15,7 @@ class NoiseScheduler:
 
         def get_random_ts(self, x):
             """ Get random t for every sample in batch """
-            t = torch.randint(0, self.timesteps, size=(x.shape[0], 1))
+            t = torch.randint(0, self.timesteps, size=(x.shape[0],))
             return t
   
 
@@ -27,12 +27,17 @@ class NoiseScheduler:
 
             if t is None:
                 t = self.get_random_ts(x).to(self.device)
+                print(t.shape)
+                print(self.alphas_cumulative.shape)
                 alpha_cum = self.alphas_cumulative[t]
+                print(alpha_cum.shape)
                 alpha_cum = alpha_cum.reshape((x.shape[0], 1, 1, 1))
+                print(alpha_cum.shape)
             
             else:
                 alpha_cum = self.alphas_cumulative[t]
 
             noise = torch.randn_like(x).to(self.device)
+            print(noise.shape)
 
-            return (torch.sqrt(alpha_cum) * x) + torch.sqrt(1-alpha_cum) * noise
+            return (torch.sqrt(alpha_cum) * x) + (torch.sqrt(1-alpha_cum) * noise), noise

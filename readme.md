@@ -18,7 +18,7 @@ During training, we randomly draw t from a uniform distribution, where t is diff
 
 The used model has been implemented from scratch by me, and I aimed to keep its formulation as close to the architecture used in the original paper. The official tensorflow implementation of the authors was used in the process.
 
-The UNET model architecture is an auto-encoder, where the spatial dimensions are gradually reduced while the amount of channels are increased. After reaching a bottleneck, the process is reversed, and spatial dimensions are gradually increased while channels are reduced, untill we once again reach the initial dimensions. To prevent a vanishing gradient, and preserve finer information, intermediary states during downsampling are preserved, and then slowly added again at each level of upsampling.
+The UNET architecture is an auto-encoder, where the spatial dimensions are gradually reduced while the amount of channels are increased. After reaching a bottleneck, the process is reversed, and spatial dimensions are gradually increased while channels are reduced, untill we once again reach the initial dimensions. To prevent a vanishing gradient, and preserve finer information, intermediary states during downsampling are saved, and then slowly concatenated again at each level of upsampling.
 
  My implementation consists of 5 resolution levels (from 128x128 to 8x8). For downsampling, each resolution levels consists of 2 ResNet block, and for upsampling, 3 ResNet blocks. At the resolution levels of 16x16, and in the bottleneck, we also use self-attention layer.
 

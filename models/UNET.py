@@ -162,6 +162,11 @@ class UNetDiff(nn.Module):
             UpsampleBlock(layer_channels_up[i-1], layer_channels_up[i], transformer_layers_up[i-1]) 
             for i in range(1, len(layer_channels_up))])
         self.upsample_layers[-1].disable_upsample() 
+    	
+        # final head
+        self.activation = nn.SiLU()
+        self.normalize_1 = nn.GroupNorm(num_groups=32, num_channels=self.model_dim)
+        self.conv_out = nn.Conv2d(self.model_dim, self.channels, kernel_size=1,)
         
 
 
@@ -179,46 +184,31 @@ class UNetDiff(nn.Module):
 
 
     def forward(self, x):
-        print(x.shape)
         x = self.resize_in(x)
 
         # Downsampling
         intermediate_xs = []
-        print("\ndownsampling")
         for layer in self.downsample_layers:
-            print(x.shape)
             intermediate_xs.append(x)
             x, after_res1, after_res2 = layer(x)
-            intermediate_xs.append(after_res1), intermediate_xs.append(after_res2)  
-            print(after_res1.shape)
-            print(after_res2.shape)
-            print()
-        print()
+            intermediate_xs.append(after_res1), intermediate_xs.append(after_res2)    
 
         # Middle
         x = self.middle_layers(x)
 
-        print("Intermediaries: ")
-        for h in intermediate_xs:
-            print(h.shape)
-        print()
-        
-
-        print(self.layer_channels_up)
-        print(self.transformer_layers_up)
-        print()
-
         # Upsampling
-        print("Upsampling: ")
         for layer in self.upsample_layers:
             skipped_xs = intermediate_xs[-3:]
             del intermediate_xs[-3:]
 
             assert(len(skipped_xs) == 3)
             x = layer(x, skipped_xs)
-        print(x.shape)
-
+        
+        # Head
+        x = self.activation(self.normalize_1(x))
+        x = self.conv_out(x)
         return x
+        
 
 
     

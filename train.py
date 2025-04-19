@@ -45,22 +45,35 @@ def train_diffusion(train_config, model_config):
     model_config.channels = dataset_information.channels
     model = UNetDiff(model_config).to(device)
 
-    print(summary(model, input_size=(32, 3, 128, 128)))
+    #print(summary(model, input_size=(32, 3, 128, 128)))
 
 
     noise_scheduler = NoiseScheduler(train_config)
-
-    for x_train, y_train in dataloader_train:
-       
+    
+    loss_function = torch.nn.MSELoss()
+    optimizer = torch.optim.Adam(lr=0.00003, params=model.parameters())
+    for i, (x_train, y_train) in enumerate(dataloader_train):
         x_train = x_train.to(device)
-        image_with_noise = noise_scheduler.add_forward_noise(x_train)
-        predicted_noise =  model(x_train)
+        with torch.no_grad():
+            image_with_noise, noise = noise_scheduler.add_forward_noise(x_train)
+        grid = plot_grid_samples_tensor(image_with_noise[:4], grid_size=[8,8])
+        writer.add_image(f"train_sample, random", grid, i)
 
+        predicted_noise =  model(image_with_noise)
+
+
+        loss = loss_function(predicted_noise, noise)
+        loss.backward()
+        optimizer.step()
+
+        print(loss.cpu())
+
+        
+        
 
         """
         grid = plot_grid_samples_tensor(x_train[:4], grid_size=[8,8])
         grid = plot_grid_samples_tensor(image_with_noise[:4], grid_size=[8,8])
         writer.add_image(f"train_sample, random", grid, 0)
         """
-        exit()
         
