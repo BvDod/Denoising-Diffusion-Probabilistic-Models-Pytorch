@@ -2,22 +2,22 @@ import torch
 import torch.nn as nn
 
 class ResidualBlock(nn.Module):
-    def __init__(self, ch_in, ch_out, timestep_emb):
+    def __init__(self, ch_in, ch_out, time_dim):
         """ 
         A residual block, with a timestep embedding added after the first conv
         """
         super(ResidualBlock, self).__init__()
 
-        """
-        self.timestemp_emb = nn.Sequential(
-            timestep_emb,
-            nn.Linear(timestemp_emb.dim, ch_in_out) # needs some reshaping still
+        self.activation = nn.SiLU()
+       
+        self.timestemp_extractor = nn.Sequential(
+            self.activation,
+            nn.Linear(time_dim*4, ch_out) # needs some reshaping still
         )
-        """
+      
         self.channels_in = ch_in
         self.channels_out = ch_out
 
-        self.activation = nn.SiLU()
         self.normalize_1 = nn.GroupNorm(num_groups=32, num_channels=self.channels_in)
 
         self.conv_1 = nn.Conv2d(self.channels_in, self.channels_out, kernel_size=3, padding=1)
@@ -31,11 +31,13 @@ class ResidualBlock(nn.Module):
 
 
 
-    def forward(self, x):
+    def forward(self, x, time_emb):
         x_in = x
         x = self.activation(self.normalize_1(x))
         x = self.conv_1(x)
-        # Add in time_emb here
+        x += self.timestemp_extractor(time_emb).reshape((*x.shape[:2], 1, 1))
+
+        
         x = self.activation(self.normalize_2(x))
         x = self.conv_2(x)
 

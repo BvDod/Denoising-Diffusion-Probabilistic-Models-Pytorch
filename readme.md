@@ -1,3 +1,24 @@
+## How to start Training
+```
+from train import train_diffusion, DiffusionConfig, ModelConfig
+
+diff_config = DiffusionConfig(
+    dataset_name = "FFHQ",
+    learning_rate = 0.001,
+    batch_size= 16,
+    use_augmentation = False,
+    timesteps_diff = 200
+)
+
+model_config = ModelConfig(
+    lowest_resolution_size = 8,
+    dim_multiply = [1,2,2,4,8],
+    transformer_layers = [3],
+    base_dim = 64
+)
+train_diffusion(diff_config, model_config)
+```
+
 ## Step 1. Forward Noise Sampling
 
 During the forward process, noise is gradually added to the original image $x_0$, where the new image $x_t$ only depends on the previous image $x_{t-1}$. Noise is added from a Gaussian distribution such that the produced image will gradually move to a distribution with pure noise from the standard normal distribution. The amount of noise added at each step is managed using $\beta_t$, and is usually gradually increased as the steps increase. A single forward transition is achieved using: 

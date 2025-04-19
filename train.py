@@ -7,7 +7,10 @@ import torch
 from functions.noise_scheduler import NoiseScheduler
 from models.UNET import UNetDiff
 
+from functions.log_to_tb import log_to_tensorboard
+
 from torchinfo import summary
+import time
 
 @dataclass
 class DiffusionConfig:
@@ -23,7 +26,8 @@ class ModelConfig:
     dim_multiply: list[int]
     transformer_layers: list[int]
     base_dim: int
-    
+
+
 
 
 def train_diffusion(train_config, model_config):
@@ -52,21 +56,27 @@ def train_diffusion(train_config, model_config):
     
     loss_function = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(lr=0.00003, params=model.parameters())
+    scaler = torch.amp.GradScaler("cuda" ,enabled=True)
+
+    time_epoch_start = time.time()
     for i, (x_train, y_train) in enumerate(dataloader_train):
+        images_to_log, metrics_to_log = {}, {}
+
         x_train = x_train.to(device)
+
         with torch.no_grad():
-            image_with_noise, noise = noise_scheduler.add_forward_noise(x_train)
-        grid = plot_grid_samples_tensor(image_with_noise[:4], grid_size=[8,8])
-        writer.add_image(f"train_sample, random", grid, i)
+            image_with_noise, noise, timesteps = noise_scheduler.add_forward_noise(x_train)
 
-        predicted_noise =  model(image_with_noise)
+        with torch.autocast(device_type=device, dtype=torch.float16, enabled=True):
+            predicted_noise =  model(image_with_noise, timesteps)
+            loss = loss_function(predicted_noise, noise)
 
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
 
-        loss = loss_function(predicted_noise, noise)
-        loss.backward()
-        optimizer.step()
-
-        print(loss.cpu())
+        log_to_tensorboard(writer, images_to_log, metrics_to_log, i)
+        
 
         
         

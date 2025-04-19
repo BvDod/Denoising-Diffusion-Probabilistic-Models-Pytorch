@@ -8,20 +8,21 @@ from models.ResBlock import ResidualBlock
 from models.transformer_block import TransformerBlock
 import torch.nn.functional as F
 
+from models.time_embedding import SinusodialEmbedding
+
 
 class DownsampleBlock(nn.Module):
-    def __init__(self, ch_in, ch_out, use_transformer, timestep_emb):
+    def __init__(self, ch_in, ch_out, use_transformer, time_dim):
         """ 
         """
         super(DownsampleBlock, self).__init__()
 
         self.use_transformer = use_transformer
         self.enable_downsample = True
-        self.timestep_emb = timestep_emb
 
         self.activation = nn.SiLU()
-        self.resnet_block1 = ResidualBlock(ch_in, ch_out, self.timestep_emb)
-        self.resnet_block2 = ResidualBlock(ch_out, ch_out, self.timestep_emb)
+        self.resnet_block1 = ResidualBlock(ch_in, ch_out, time_dim)
+        self.resnet_block2 = ResidualBlock(ch_out, ch_out, time_dim)
         
         if self.use_transformer:
             self.transformer1 = TransformerBlock(ch_out)
@@ -34,14 +35,14 @@ class DownsampleBlock(nn.Module):
         self.conv_downsample = None
     
 
-    def forward(self, x):
+    def forward(self, x, time_emb):
 
-        x = self.resnet_block1(x)
+        x = self.resnet_block1(x, time_emb)
         if self.use_transformer:
             x = self.transformer1(x)
         after_res1 = x
 
-        x = self.resnet_block2(x)
+        x = self.resnet_block2(x, time_emb)
         if self.use_transformer:
             x = self.transformer2(x)
         after_res2 = x
@@ -52,7 +53,7 @@ class DownsampleBlock(nn.Module):
 
 
 class UpsampleBlock(nn.Module):
-    def __init__(self, ch_in, ch_out, use_transformer):
+    def __init__(self, ch_in, ch_out, use_transformer, time_dim):
         """ 
         """
         super(UpsampleBlock, self).__init__()
@@ -60,9 +61,9 @@ class UpsampleBlock(nn.Module):
         self.use_transformer = use_transformer
         self.enable_upsample = True
 
-        self.resnet_block1 = ResidualBlock(ch_in*2, ch_in, None)
-        self.resnet_block2 = ResidualBlock(ch_in*2, ch_out, None)
-        self.resnet_block3 = ResidualBlock(ch_out*2, ch_out, None)
+        self.resnet_block1 = ResidualBlock(ch_in*2, ch_in, time_dim)
+        self.resnet_block2 = ResidualBlock(ch_in*2, ch_out, time_dim)
+        self.resnet_block3 = ResidualBlock(ch_out*2, ch_out, time_dim)
         
         if self.use_transformer:
             self.transformer1 = TransformerBlock(ch_in)
@@ -76,22 +77,22 @@ class UpsampleBlock(nn.Module):
         self.conv_upsample = None
     
 
-    def forward(self, x, skipped_xs):
+    def forward(self, x, skipped_xs, time_emb):
 
         h1, h2, h3 = skipped_xs
 
         x = torch.concat([x, h3], dim=1)
-        x = self.resnet_block1(x)
+        x = self.resnet_block1(x, time_emb)
         if self.use_transformer:
             x = self.transformer1(x)
 
         x = torch.concat([x, h2], dim=1)
-        x = self.resnet_block2(x)
+        x = self.resnet_block2(x, time_emb)
         if self.use_transformer:
             x = self.transformer2(x)
         
         x = torch.concat([x, h1], dim=1)
-        x = self.resnet_block3(x)
+        x = self.resnet_block3(x, time_emb)
         if self.use_transformer:
             x = self.transformer3(x)
 
@@ -126,29 +127,26 @@ class UNetDiff(nn.Module):
         self.layer_channels = self.calculate_resolution_layer_channels() # Get channel amount at each layer
         self.transformer_layers_bool = [i in self.transformer_layers for i in range(self.resolution_amount)]
         
-        self.time_embedding = None
-        """
-        nn.Sequential(
-            sinusodialEmbedding(self.model_dim),
+        self.time_embedding = nn.Sequential(
+            SinusodialEmbedding(self.model_dim),
             nn.Linear(self.model_dim, self.model_dim*4),
             torch.nn.SiLU(),
             nn.Linear(self.model_dim*4, self.model_dim*4),
         )
-        """
         
         # Downsampling 
         self.resize_in = nn.Conv2d(self.channels, self.model_dim, 1)
         self.downsample_layers = nn.Sequential(*[
-            DownsampleBlock(self.layer_channels[i-1], self.layer_channels[i], self.transformer_layers_bool[i-1], self.time_embedding) 
+            DownsampleBlock(self.layer_channels[i-1], self.layer_channels[i], self.transformer_layers_bool[i-1], self.model_dim) 
             for i in range(1, len(self.layer_channels))])
         self.downsample_layers[-1].disable_downsample() 
 
         # Middle
         channels = self.layer_channels[-1]
         self.middle_layers = nn.Sequential(
-            ResidualBlock(channels, channels, None),
+            ResidualBlock(channels, channels, self.model_dim),
             TransformerBlock(channels),
-            ResidualBlock(channels, channels, None),
+            ResidualBlock(channels, channels, self.model_dim),
         )
 
         # Upsampling
@@ -159,7 +157,7 @@ class UNetDiff(nn.Module):
         self.transformer_layers_up = transformer_layers_up
 
         self.upsample_layers = nn.Sequential(*[
-            UpsampleBlock(layer_channels_up[i-1], layer_channels_up[i], transformer_layers_up[i-1]) 
+            UpsampleBlock(layer_channels_up[i-1], layer_channels_up[i], transformer_layers_up[i-1], self.model_dim) 
             for i in range(1, len(layer_channels_up))])
         self.upsample_layers[-1].disable_upsample() 
     	
@@ -183,18 +181,24 @@ class UNetDiff(nn.Module):
         return layer_ch  
 
 
-    def forward(self, x):
+    def forward(self, x, timesteps):
+        time_emb = self.time_embedding(timesteps)
+
         x = self.resize_in(x)
 
         # Downsampling
         intermediate_xs = []
         for layer in self.downsample_layers:
             intermediate_xs.append(x)
-            x, after_res1, after_res2 = layer(x)
+            x, after_res1, after_res2 = layer(x, time_emb)
             intermediate_xs.append(after_res1), intermediate_xs.append(after_res2)    
 
         # Middle
-        x = self.middle_layers(x)
+        for layer in self.middle_layers:
+            if type(layer) == ResidualBlock:
+                x = layer(x, time_emb)
+            else:
+                x = layer(x)
 
         # Upsampling
         for layer in self.upsample_layers:
@@ -202,7 +206,7 @@ class UNetDiff(nn.Module):
             del intermediate_xs[-3:]
 
             assert(len(skipped_xs) == 3)
-            x = layer(x, skipped_xs)
+            x = layer(x, skipped_xs, time_emb)
         
         # Head
         x = self.activation(self.normalize_1(x))
