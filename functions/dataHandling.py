@@ -11,7 +11,6 @@ def get_dataset(config, ):
     if config.use_augmentation:
         img_transforms = transforms.Compose([ 
             transforms.RandomHorizontalFlip(),
-            transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.2, hue=0.1),
             transforms.RandomAffine(3, scale=(0.95, 1.05)),
             transforms.ToTensor(),
             torchvision.transforms.Normalize(0.5, 0.5)] # output = (input - 0.5) / 0.5

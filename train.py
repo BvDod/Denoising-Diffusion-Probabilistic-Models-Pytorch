@@ -28,8 +28,6 @@ class ModelConfig:
     base_dim: int
 
 
-
-
 def train_diffusion(train_config, model_config):
     """ Main function to train the diffusion model """
 
@@ -43,7 +41,7 @@ def train_diffusion(train_config, model_config):
     print(f"Dataset information: {dataset_information}\n")
 
     dataloader_train = DataLoader(train, batch_size=train_config.batch_size, shuffle=True, drop_last=True, pin_memory=False)
-    dataloader_test = DataLoader(test, batch_size=train_config.batch_size*3, pin_memory=False)
+    dataloader_test = DataLoader(test, batch_size=train_config.batch_size*2, pin_memory=False)
 
     model_config.image_size = dataset_information.image_size
     model_config.channels = dataset_information.channels
@@ -55,27 +53,80 @@ def train_diffusion(train_config, model_config):
     noise_scheduler = NoiseScheduler(train_config)
     
     loss_function = torch.nn.MSELoss()
-    optimizer = torch.optim.Adam(lr=0.00003, params=model.parameters())
+    optimizer = torch.optim.Adam(lr=train_config.learning_rate, params=model.parameters())
     scaler = torch.amp.GradScaler("cuda" ,enabled=True)
 
-    time_epoch_start = time.time()
-    for i, (x_train, y_train) in enumerate(dataloader_train):
-        images_to_log, metrics_to_log = {}, {}
+    for epoch in range(1000):
+        print(f"\nStart Epoch{epoch}")
 
-        x_train = x_train.to(device)
+        # Training
+        time_epoch_start = time.time()
+        loss_epoch = []
 
-        with torch.no_grad():
-            image_with_noise, noise, timesteps = noise_scheduler.add_forward_noise(x_train)
+        model.train()
+        for i, (x_train, y_train) in enumerate(dataloader_train):
+            images_to_log, metrics_to_log = {}, {}
 
-        with torch.autocast(device_type=device, dtype=torch.float16, enabled=True):
-            predicted_noise =  model(image_with_noise, timesteps)
-            loss = loss_function(predicted_noise, noise)
+            x_train = x_train.to(device)
 
-        scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
+            with torch.no_grad():
+                image_with_noise, noise, timesteps = noise_scheduler.add_forward_noise(x_train)
 
+            with torch.autocast(device_type=device, dtype=torch.float16, enabled=True):
+                predicted_noise =  model(image_with_noise, timesteps)
+                loss = loss_function(predicted_noise, noise)
+                loss_epoch.append(loss.item())
+                loss = loss / 4 
+
+            scaler.scale(loss).backward()
+            
+            if (i + 1) % 4 == 0:
+                scaler.step(optimizer)
+                scaler.update()
+                optimizer.zero_grad()
+
+            if (i + 1) % 100 == 0:
+                log_to_tensorboard(writer, {}, {"Loss 100 epochs": sum(loss_epoch[-99:])/99}, int((i + 1)/ 100) + (epoch*(len(dataloader_train) // 100)))
+
+
+        images_to_log = {
+        "Image Clean (Training)": x_train[-9:], 
+        "Image with noise (Training)": image_with_noise[-9:],
+        "Noise (Training)": noise[-9:],
+        "Predicted Noise (Training)": predicted_noise[-9:] 
+        }
+        metrics_to_log = {"Loss (Training)": sum(loss_epoch)/len(loss_epoch)}
         log_to_tensorboard(writer, images_to_log, metrics_to_log, i)
+        
+
+        # Validation
+        model.eval()
+        optimizer.zero_grad()
+
+        loss_epoch_val = []
+        with torch.no_grad():
+            for i, (x_test, y_test) in enumerate(dataloader_test):
+                images_to_log, metrics_to_log = {}, {}
+
+                x_test = x_test.to(device)
+
+                with torch.no_grad():
+                    image_with_noise, noise, timesteps = noise_scheduler.add_forward_noise(x_test)
+
+                with torch.autocast(device_type=device, dtype=torch.float16, enabled=True):
+                    predicted_noise =  model(image_with_noise, timesteps)
+                    loss = loss_function(predicted_noise, noise)
+                loss_epoch_val.append(loss.item())
+   
+        images_to_log = {
+        "Image Clean (Eval)": x_test[-9:], 
+        "Image with noise (Eval)": image_with_noise[-9:],
+        "Noise (Eval)": noise[-9:],
+        "Predicted Noise (Eval)": predicted_noise[-9:] 
+        }
+        metrics_to_log = {"Loss (Eval)": sum(loss_epoch_val)/len(loss_epoch_val)}
+        log_to_tensorboard(writer, images_to_log, metrics_to_log, i)
+        
         
 
         
