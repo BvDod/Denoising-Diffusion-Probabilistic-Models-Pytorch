@@ -11,6 +11,9 @@ from functions.log_to_tb import log_to_tensorboard
 
 from torchinfo import summary
 import time
+import os
+
+import copy
 
 @dataclass
 class DiffusionConfig:
@@ -46,6 +49,18 @@ def train_diffusion(train_config, model_config):
     model_config.image_size = dataset_information.image_size
     model_config.channels = dataset_information.channels
     model = UNetDiff(model_config).to(device)
+    model.load_state_dict(torch.load("models/saved_models/model_3.pt", weights_only=True))
+
+    ema_model = copy.deepcopy(model)
+    model.load_state_dict(torch.load("models/saved_models/model_ema_3.pt", weights_only=True))
+
+    def update_ema_variables(model, ema_model, ema_decay=0.999):
+        with torch.no_grad():
+            model_state_dict = model.state_dict()
+            ema_state_dict = ema_model.state_dict()
+
+            for key in model_state_dict.keys():
+                ema_state_dict[key].mul_(ema_decay).add_(model_state_dict[key], alpha=1 - ema_decay)
 
     #print(summary(model, input_size=(32, 3, 128, 128)))
 
@@ -85,6 +100,8 @@ def train_diffusion(train_config, model_config):
                 scaler.update()
                 optimizer.zero_grad()
 
+                update_ema_variables(model, ema_model)
+
             if (i + 1) % 100 == 0:
                 log_to_tensorboard(writer, {}, {"Loss 100 epochs": sum(loss_epoch[-99:])/99}, int((i + 1)/ 100) + (epoch*(len(dataloader_train) // 100)))
 
@@ -96,8 +113,13 @@ def train_diffusion(train_config, model_config):
         "Predicted Noise (Training)": predicted_noise[-9:] 
         }
         metrics_to_log = {"Loss (Training)": sum(loss_epoch)/len(loss_epoch)}
-        log_to_tensorboard(writer, images_to_log, metrics_to_log, i)
-        
+        log_to_tensorboard(writer, images_to_log, metrics_to_log, epoch)
+
+        ## Save model to disk
+        path = f"models/saved_models/"
+        os.makedirs(path, exist_ok = True) 
+        torch.save(model.state_dict(), path + f"model_{epoch}.pt")
+        torch.save(ema_model.state_dict(), path + f"model_ema_{epoch}.pt")
 
         # Validation
         model.eval()
@@ -114,7 +136,7 @@ def train_diffusion(train_config, model_config):
                     image_with_noise, noise, timesteps = noise_scheduler.add_forward_noise(x_test)
 
                 with torch.autocast(device_type=device, dtype=torch.float16, enabled=True):
-                    predicted_noise =  model(image_with_noise, timesteps)
+                    predicted_noise =  ema_model(image_with_noise, timesteps)
                     loss = loss_function(predicted_noise, noise)
                 loss_epoch_val.append(loss.item())
    
@@ -125,7 +147,7 @@ def train_diffusion(train_config, model_config):
         "Predicted Noise (Eval)": predicted_noise[-9:] 
         }
         metrics_to_log = {"Loss (Eval)": sum(loss_epoch_val)/len(loss_epoch_val)}
-        log_to_tensorboard(writer, images_to_log, metrics_to_log, i)
+        log_to_tensorboard(writer, images_to_log, metrics_to_log, epoch)
         
         
 
