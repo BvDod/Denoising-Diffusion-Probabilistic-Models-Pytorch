@@ -1,6 +1,6 @@
 # Denoising Diffusion Probabilistic Model in PyTorch
 
-Work In Progress: basically, everything is implemented, but I still need to train a final model that I'm happy with. I also still need to clean up this readme and add more explanations!
+**Work In Progress**: basically, everything is implemented, but I still need to train a final model that I'm happy with. I also still need to clean up this readme and add more explanations!
 
 In this repository, I will implement my own version of a denoising diffusion model to synthesize images, according to the specifications found in the original paper: *Denoising Diffusion Probabilistic Models* by J.Ho et al. I will take the reader through the different steps required to implement such a model
 
