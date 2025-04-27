@@ -2,6 +2,8 @@
 
 **Work In Progress**: basically, everything is implemented, but I still need to train a final model that I'm happy with. I also still need to clean up this readme and add more explanations!
 
+**Future**: After completing this basic DDPM implementation, I aim to use this code as the basis for unsupervised anomaly detection of medical imaging. Even further in the future, I want to also support 3d-images.
+
 In this repository, I will implement my own version of a denoising diffusion model to synthesize images, according to the specifications found in the original paper: *Denoising Diffusion Probabilistic Models* by J.Ho et al. I will take the reader through the different steps required to implement such a model
 
 ## Step 1: Forward Noise Sampling
