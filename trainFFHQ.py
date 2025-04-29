@@ -2,7 +2,7 @@ from train import train_diffusion, DiffusionConfig, ModelConfig
 
 diff_config = DiffusionConfig(
     dataset_name = "FFHQ",
-    learning_rate = 0.00003,
+    learning_rate = 0.00001,
     batch_size= 20,
     use_augmentation = False,
     timesteps_diff = 1000,

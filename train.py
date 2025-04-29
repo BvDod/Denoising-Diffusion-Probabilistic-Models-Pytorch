@@ -49,10 +49,8 @@ def train_diffusion(train_config, model_config):
     model_config.image_size = dataset_information.image_size
     model_config.channels = dataset_information.channels
     model = UNetDiff(model_config).to(device)
-    model.load_state_dict(torch.load("models/saved_models/model_3.pt", weights_only=True))
 
     ema_model = copy.deepcopy(model)
-    model.load_state_dict(torch.load("models/saved_models/model_ema_3.pt", weights_only=True))
 
     def update_ema_variables(model, ema_model, ema_decay=0.999):
         with torch.no_grad():

@@ -1,8 +1,8 @@
 # Denoising Diffusion Probabilistic Model in PyTorch
 
-In this repository, I will implement my ow version of a denoising diffusion model to synthesize images, according to the specifications found in the orginal paper: *Denoising Diffusion Probabilistic Models* by J.Ho et al. I will take the reader through the different steps are that required to implement such a model
+![alt text](<ezgif.com-animated-gif-maker (4).gif>)
 
-## Step 1: Forward Noise Sampling
+In this repository, I will implement my own version of a denoising diffusion model to synthesize images, according to the specifications found in the orginal paper: *Denoising Diffusion Probabilistic Models* by J.Ho et al. I will take the reader through the different steps are that required to implement such a model
 
 During the forward process, noise is gradually added to the original image $x_0$, where the new image $x_t$ only depends on the previous image $x_{t-1}$. Noise is added from a Gaussian distribution such that the produced image will gradually move to a distribution with pure noise from the standard normal distribution. The amount of noise added at each step is managed using $\beta_t$, and is usually gradually increased as the steps increase. A single forward transition is achieved using: 
 
@@ -76,35 +76,26 @@ The following results are only preliminary, run on local hardware, and only mean
 ### Test-run #1
 ![alt text](f6bd321d-d389-4dd7-8837-7f5cd98f5a39.png)
 
-Validation loss: 
-
 The results are clearly not optimal, but we can also see some defenite facial structures.
 
 I specifically think a big error was keeping the same beta schedule, while reducing the amount of timesteps from 1000 to 200. Even though the average beta per step will be the same, the overall amount of noise added will be less. At T, this should result in an image that is 5 times LESS close to a perfect normal gaussian distrubution. When looking at the intermediary images in the diffusion process, something that sticks out, is that the model seems to overcommit to details regarding texture and background before determining a global low detail structure of a face. This could be due to the lack of training in the inital stages of moving away from a normal gaussian distribution.
 
 ### Test-run #2
-For test-run 2, i increased the timesteps from 200 to 1000.
+For test-run 2, first, I increased the timesteps from 200 to 1000, but still only for 45 epochs
+
+apperently EMA (exponential moving average) is pretty essential and can have a BIG impact on performance. I assumed its effect on performance would only be minor so i didnt add it yet. Test run 2 was performed after implementing ema, using a decay factor of 0.9999
 
 ![alt text](image-2.png)
 
-Validation loss: 
-
 Output is clearly improved compared to previous resultsm, most notably the diversity.
-
-### Test-run #3
-apperently EMA (exponential moving average) is pretty essential and can have a BIG impact on performance. I assumed its effect on performance would only be minor so i didnt add it yet. Test-run 3 was performed after implementing ema, using a decay factor of 0.9999
-
-Validation loss: 
-
-### Final Test run
-
-For the final test-run, the model was trained untill convergence, instead of just for 50 epochs.
-
-Validation loss:
-TODO!
-
 
 
 ## Results: Full-run
 
-TODO: run bigger model for more epochs on rented GPU's
+For the final full run, I trained the model using double the base feature dimension, 128. I also intend to train untill full convergence. This will be performed on rented cloud GPU's
+
+result: See gif on top of the page for intermediary results (hasnt converged yet)
+
+For the final run, I also decided to use image augmentation, namely horizontal flips and small random rotations. Interestingly this ended up also affecting the samples. You can see the samples seem rotated, with some small black bezels surrounding the sample.
+
+
