@@ -100,6 +100,8 @@ Output is clearly improved compared to previous results, most notably the divers
 
 For the final full run, I trained the model using double the base feature dimension, 128. I also intend to train untill full convergence. This will be performed on rented cloud GPU's
 
+![alt text](0.png)
+
 result: See gif on top of the page for intermediary results (hasnt converged yet)
 
 For the final run, I also decided to use image augmentation, namely horizontal flips and small random rotations. Interestingly this ended up also affecting the samples. You can see the samples seem rotated, with some small black bezels surrounding the sample.
